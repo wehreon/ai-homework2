@@ -55,3 +55,110 @@ print("=" * 60)
 
 df.to_csv('ICData_cleaned.csv', index=False, encoding='utf-8')
 print("\n数据已保存为 ICData_cleaned.csv")
+# 任务2：时间分布分析
+import matplotlib.pyplot as plt
+
+print("\n" + "=" * 60)
+print("任务2：时间分布分析")
+print("=" * 60)
+
+#早晚时段刷卡量统计
+# .values 将pandas的Series转换为numpy数组，以便使用numpy的向量化运算
+# boarding_mask ，early_mask 是一个布尔数组，分别表示该行是上车记录（刷卡类型=0）和该行时间在7点之前
+# np.sum() 对布尔数组求和，True计为1，False计为0，从而统计满足条件的记录数
+
+# 筛选上车记录（刷卡类型=0）
+boarding_mask = (df['刷卡类型'] == 0).values  # 转为numpy数组
+
+# 早峰前时段：hour < 7
+early_mask = (df['hour'] < 7).values
+early_boarding = np.sum(boarding_mask & early_mask)
+
+# 深夜时段：hour >= 22
+late_mask = (df['hour'] >= 22).values
+late_boarding = np.sum(boarding_mask & late_mask)
+
+# 全天总上车刷卡量
+total_boarding = np.sum(boarding_mask)
+
+# 计算百分比
+early_pct = early_boarding / total_boarding * 100
+late_pct = late_boarding / total_boarding * 100
+
+print("\n【(a) 早晚时段刷卡量统计（使用numpy布尔索引）】")
+print(f"早峰前时段 (hour < 7) 刷卡量: {early_boarding} 次")
+print(f"深夜时段 (hour >= 22) 刷卡量: {late_boarding} 次")
+print(f"全天总上车刷卡量: {total_boarding} 次")
+print(f"早峰前时段占比: {early_pct:.2f}%")
+print(f"深夜时段占比: {late_pct:.2f}%")
+
+#分时客流量统计
+print("\n【(b) 分时客流量统计】")
+
+# 统计每个小时的刷卡量
+hourly_boarding = df[df['刷卡类型'] == 0].groupby('hour').size()
+
+print("各小时上车刷卡量:")
+for h in range(24):
+    count = hourly_boarding.get(h, 0)
+    print(f"  {h:2d}:00 - {h:2d}:59: {count:6d} 次")
+
+#高峰小时系数PHF计算
+print("\n【(c) 高峰小时系数PHF计算】")
+
+# 找出客流量最大的小时
+peak_hour = hourly_boarding.idxmax()
+peak_hour_volume = hourly_boarding.max()
+print(f"高峰小时: {peak_hour}:00 - {peak_hour}:59")
+print(f"高峰小时客流量: {peak_hour_volume} 次")
+
+
+# 解释：dt.floor('15min')的作用，PHF公式的含义，PHF值代表什么。
+# dt.floor('15min') 将时间向下取整到15分钟的整数倍边界。
+# groupby('time_15min').size() 统计每个15分钟时段内的刷卡次数。
+# PHF = 高峰小时总客流量 / (4 × 最大15分钟客流量)，而其值越接近1，则说明客流分布越均匀，越小则说明峰值越集中。
+# 筛选高峰小时内的上车记录
+peak_hour_mask = (df['刷卡类型'] == 0) & (df['hour'] == peak_hour)
+peak_hour_df = df[peak_hour_mask].copy()
+
+# 将交易时间按15分钟向下取整
+peak_hour_df['time_15min'] = peak_hour_df['交易时间'].dt.floor('15min')
+
+# 统计每15分钟的刷卡量
+min15_volumes = peak_hour_df.groupby('time_15min').size().values
+
+# PHF计算公式：高峰小时总流量 / (4 × 最大15分钟流量)
+max_15min_volume = min15_volumes.max() if len(min15_volumes) > 0 else 0
+phf = peak_hour_volume / (4 * max_15min_volume) if max_15min_volume > 0 else 0
+
+print(f"\n各15分钟时段客流量: {min15_volumes.tolist()}")
+print(f"最大15分钟客流量: {max_15min_volume} 次")
+print(f"PHF = {peak_hour_volume} / (4 × {max_15min_volume}) = {phf:.4f}")
+
+#柱状图绘制（matplotlib）
+print("\n【(d) 绘制分时客流量柱状图】")
+
+# 准备绘图数据
+hours = list(range(24))
+counts = [hourly_boarding.get(h, 0) for h in hours]
+
+plt.figure(figsize=(12, 6))
+plt.bar(hours, counts, color='steelblue', edgecolor='black')
+plt.xlabel('小时', fontsize=12)
+plt.ylabel('上车刷卡量（次）', fontsize=12)
+plt.title('全天分时上车客流量分布', fontsize=14)
+plt.xticks(hours)
+plt.grid(axis='y', alpha=0.3)
+
+# 标注高峰小时
+plt.bar(peak_hour, peak_hour_volume, color='orange', edgecolor='black', 
+        label=f'高峰小时 {peak_hour}:00')
+plt.legend()
+
+# 保存图片
+plt.savefig('hour_distribution.png', dpi=150, bbox_inches='tight')
+print("柱状图已保存为 hour_distribution.png")
+
+plt.show()
+
+print("=" * 60)
