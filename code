@@ -1,1 +1,57 @@
-main
+import pandas as pd
+import numpy as np
+
+print("=" * 60)
+print("任务1：数据预处理")
+print("=" * 60)
+
+df = pd.read_csv(r'C:\Users\adp\Desktop\ICData.csv', sep='\t')#1：数据读取
+
+print(f"\n原始数据形状: {df.shape[0]} 行 × {df.shape[1]} 列")
+print("\n前5行数据预览:")
+print(df.head(5))
+print("\n各列数据类型:")
+print(df.dtypes)
+
+df['交易时间'] = pd.to_datetime(df['交易时间'], format='%Y/%m/%d %H:%M:%S')#2：时间解析
+df['hour'] = df['交易时间'].dt.hour# pd.to_datetime()函数将字符串'2018/4/1 11:45:12'转换成pandas的数据对象，转换后才能使用dt访问器提取时间属性
+
+print(f"\n时间列转换完成")#:dt是datetime的访问器，.hour属性提取小时数（0-23）,提取hour是为了后续分时段统计客流量，分析早晚高峰
+print(f"交易时间类型: {df['交易时间'].dtype}")
+print(f"hour 列取值范围: {df['hour'].min()} ~ {df['hour'].max()}")
+
+df['ride_stops'] = np.absolute(df['下车站点'] - df['上车站点'])#衍生字段构造
+abnormal_count = (df['ride_stops'] == 0).sum()
+print(f"\n发现 ride_stops = 0 的异常记录数: {abnormal_count}")
+
+df_before = len(df)
+df = df[df['ride_stops'] > 0].copy()
+df_after = len(df)
+
+print(f"已删除 {df_before - df_after} 行异常记录")
+print(f"删除后数据形状: {df.shape[0]} 行 × {df.shape[1]} 列")
+
+print("\n各列缺失值数量:")#缺失值检查
+print(df.isnull().sum())
+
+if df['驾驶员编号'].isnull().sum() > 0 or (df['驾驶员编号'] == 0).sum() > 0:
+    route_driver_mode = df[df['驾驶员编号'] > 0].groupby('线路号')['驾驶员编号'].agg(
+        lambda x: x.mode().iloc[0] if len(x.mode()) > 0 else np.nan
+    )
+    
+    def fill_driver(row):
+        if pd.isna(row['驾驶员编号']) or row['驾驶员编号'] == 0:
+            if row['线路号'] in route_driver_mode.index:
+                return route_driver_mode[row['线路号']]
+            else:
+                return df['驾驶员编号'].mode().iloc[0]
+        return row['驾驶员编号']
+    
+    df['驾驶员编号'] = df.apply(fill_driver, axis=1)
+    print("已使用线路内最常见驾驶员编号填充缺失值")
+
+print(f"\n最终数据形状: {df.shape}")
+print("=" * 60)
+
+df.to_csv('ICData_cleaned.csv', index=False, encoding='utf-8')
+print("\n数据已保存为 ICData_cleaned.csv")
