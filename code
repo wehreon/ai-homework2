@@ -258,3 +258,82 @@ print("条形图已保存为 route_stops.png")
 plt.show()
 
 print("=" * 60)
+
+
+# 任务4：高峰小时系数计算
+print("\n" + "=" * 60)
+print("任务4：高峰小时系数计算")
+print("=" * 60)
+
+#1. 高峰小时识别，统计全天各小时刷卡量（仅上车记录）
+hourly_boarding = df[df['刷卡类型'] == 0].groupby('hour').size()
+
+# 找出刷卡量最大的小时
+peak_hour = hourly_boarding.idxmax()
+peak_hour_volume = hourly_boarding.max()
+
+print(f"\n【高峰小时识别】")
+print(f"高峰小时：{peak_hour:02d}:00 ~ {peak_hour:02d}:59，刷卡量：{peak_hour_volume} 次")
+
+# 只保留高峰小时内、且为上车类型的记录
+peak_hour_mask = (df['刷卡类型'] == 0) & (df['hour'] == peak_hour)
+peak_df = df[peak_hour_mask].copy()
+
+#2. PHF5计算（5分钟粒度）
+print(f"\n【PHF5计算】")
+
+# dt.floor('5min') 将交易时间向下取整到5分钟的整数倍边界
+# 这样高峰小时会被划分为12个5分钟时段
+peak_df['time_5min'] = peak_df['交易时间'].dt.floor('5min')
+
+# 统计每个5分钟时段的刷卡量
+min5_volumes = peak_df.groupby('time_5min').size()
+
+# 找出最大5分钟刷卡量及其对应时段
+max_5min_volume = min5_volumes.max()
+max_5min_time = min5_volumes.idxmax()
+
+# 分母的12代表1小时=12个5分钟，乘以最大5分钟流量是假设全小时都按峰值计算的理论最大值
+phf5 = peak_hour_volume / (12 * max_5min_volume)
+
+# 格式化时段显示
+start_time = max_5min_time.strftime('%H:%M')
+end_time = (max_5min_time + pd.Timedelta(minutes=5)).strftime('%H:%M')
+
+print(f"最大5分钟刷卡量（{start_time}~{end_time}）：{max_5min_volume} 次")
+print(f"PHF5 = {peak_hour_volume} / (12 × {max_5min_volume}) = {phf5:.4f}")
+
+#3. PHF15计算（15分钟粒度）
+print(f"\n【PHF15计算】")
+
+# dt.floor('15min') 将交易时间向下取整到15分钟的整数倍边界
+# 这样高峰小时会被划分为4个15分钟时段
+peak_df['time_15min'] = peak_df['交易时间'].dt.floor('15min')
+
+# 统计每个15分钟时段的刷卡量
+min15_volumes = peak_df.groupby('time_15min').size()
+
+# 找出最大15分钟刷卡量及其对应时段
+max_15min_volume = min15_volumes.max()
+max_15min_time = min15_volumes.idxmax()
+
+# PHF15计算公式：高峰小时总刷卡量 / (4 × 最大15分钟刷卡量)
+# 分母的4代表1小时=4个15分钟，乘以最大15分钟流量是假设全小时都按峰值计算的理论最大值
+phf15 = peak_hour_volume / (4 * max_15min_volume)
+
+# 格式化时段显示
+start_time_15 = max_15min_time.strftime('%H:%M')
+end_time_15 = (max_15min_time + pd.Timedelta(minutes=15)).strftime('%H:%M')
+
+print(f"最大15分钟刷卡量（{start_time_15}~{end_time_15}）：{max_15min_volume} 次")
+print(f"PHF15 = {peak_hour_volume} / (4 × {max_15min_volume}) = {phf15:.4f}")
+
+#4. 汇总输出
+print(f"\n【汇总结果】")
+print(f"高峰小时：{peak_hour:02d}:00 ~ {peak_hour:02d}:59，刷卡量：{peak_hour_volume} 次")
+print(f"最大5分钟刷卡量（{start_time}~{end_time}）：{max_5min_volume} 次")
+print(f"PHF5  = {peak_hour_volume} / (12 × {max_5min_volume}) = {phf5:.4f}")
+print(f"最大15分钟刷卡量（{start_time_15}~{end_time_15}）：{max_15min_volume} 次")
+print(f"PHF15 = {peak_hour_volume} / ( 4 × {max_15min_volume}) = {phf15:.4f}")
+
+print("=" * 60)
