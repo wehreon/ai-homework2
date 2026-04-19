@@ -133,7 +133,6 @@ plt.show()
 
 
 ## 3. Debug 记录
-（记录一次解决报错的过程，例如：时区解析报错 / 热力图中文乱码 / ride_stops=0 导致的结果偏差）
 报错现象：在任务6生成热力图时，图表中的中文标题、行列标签显示为方框乱码，如xy轴，标题都错误的显示为方框，这是因为matplotlib/seaborn 默认字体不支持中文显示，需要手动指定系统中存在的中文字体。
 解决过程：要想解决就必须在代码前添加中文配置：
 import matplotlib.pyplot as plt
@@ -143,7 +142,49 @@ plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示异常
 
 
 ## 4. 人工代码审查（逐行中文注释）
-（贴出任务4 PHF 计算的核心代码，并加上你自己的逐行中文注释）
-```python
-# 贴入代码及注释
-```
+#PHF5计算（5分钟粒度）
+# dt.floor('5min') 将交易时间向下取整到最近的5分钟整点边界
+# 这样高峰小时内的所有记录会被自动划分到12个5分钟时间段中
+peak_df['time_5min'] = peak_df['交易时间'].dt.floor('5min')
+
+# 按5分钟时间段分组，统计每个时间段内的刷卡次数
+min5_volumes = peak_df.groupby('time_5min').size()
+
+# 找出12个时间段中刷卡量最大的那个，作为PHF5计算的分母依据
+max_5min_volume = min5_volumes.max()
+max_5min_time = min5_volumes.idxmax()  # 最大值对应的时间段起始时刻
+
+# PHF5 = 高峰小时总刷卡量 ÷ (12 × 最大5分钟刷卡量)
+# 1小时包含12个5分钟，乘以最大5分钟流量
+# 相当于假设整个小时都按最高峰的5分钟速率运行时的理论最大客流量
+# PHF值越接近1，说明高峰小时内客流分布越均匀；越小则峰值越集中
+phf5 = peak_hour_volume / (12 * max_5min_volume)
+
+# 格式化输出时间段（起始时刻 ~ 起始时刻+5分钟）
+start_time = max_5min_time.strftime('%H:%M')
+end_time = (max_5min_time + pd.Timedelta(minutes=5)).strftime('%H:%M')
+print(f"最大5分钟刷卡量（{start_time}~{end_time}）：{max_5min_volume} 次")
+print(f"PHF5 = {peak_hour_volume} / (12 × {max_5min_volume}) = {phf5:.4f}")
+
+#PHF15计算（15分钟粒度），基本与上面同理。
+# dt.floor('15min') 将交易时间向下取整到最近的15分钟整点边界
+# 这样高峰小时内的所有记录会被自动划分到4个15分钟时间段中
+peak_df['time_15min'] = peak_df['交易时间'].dt.floor('15min')
+
+# 按15分钟时间段分组，统计每个时间段内的刷卡次数
+min15_volumes = peak_df.groupby('time_15min').size()
+
+# 找出4个时间段中刷卡量最大的那个，作为PHF15计算的分母依据
+max_15min_volume = min15_volumes.max()
+max_15min_time = min15_volumes.idxmax()
+
+# PHF15 = 高峰小时总刷卡量 ÷ (4 × 最大15分钟刷卡量)
+1小时包含4个15分钟，乘以最大15分钟流量
+# 相当于假设整个小时都按最高峰的15分钟速率运行时的理论最大客流量
+phf15 = peak_hour_volume / (4 * max_15min_volume)
+
+# 格式化输出时间段
+start_time_15 = max_15min_time.strftime('%H:%M')
+end_time_15 = (max_15min_time + pd.Timedelta(minutes=15)).strftime('%H:%M')
+print(f"最大15分钟刷卡量（{start_time_15}~{end_time_15}）：{max_15min_volume} 次")
+print(f"PHF15 = {peak_hour_volume} / (4 × {max_15min_volume}) = {phf15:.4f}")
