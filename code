@@ -163,3 +163,98 @@ print("柱状图已保存为 hour_distribution.png")
 plt.show()
 
 print("=" * 60)
+# 任务3：线路站点分析
+import seaborn as sns
+
+# 设置中文字体
+plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans']
+plt.rcParams['axes.unicode_minus'] = False
+
+print("\n" + "=" * 60)
+print("任务3：线路站点分析")
+print("=" * 60)
+
+def analyze_route_stops(df, route_col='线路号', stops_col='ride_stops'):#函数定义
+    """
+    计算各线路乘客的平均搭乘站点数及其标准差。
+    Parameters
+    ----------
+    df : pd.DataFrame  预处理后的数据集
+    route_col : str    线路号列名
+    stops_col : str    搭乘站点数列名
+    Returns
+    -------
+    pd.DataFrame  包含列：线路号、mean_stops、std_stops，按 mean_stops 降序排列
+    """
+    # groupby(route_col) 按线路号分组，将同一条线路的所有刷卡记录归到一起
+    # [stops_col] 指定要对搭乘站点数这一列进行聚合计算
+    # agg(['mean', 'std']) 同时计算均值（反映平均搭乘距离）和标准差（反映离散程度）
+    # reset_index() 将分组键线路号从索引恢复为普通列
+    result = df.groupby(route_col)[stops_col].agg(['mean', 'std']).reset_index()
+    result.columns = [route_col, 'mean_stops', 'std_stops']
+    result = result.sort_values('mean_stops', ascending=False).reset_index(drop=True)
+    return result
+
+route_stats = analyze_route_stops(df)#调用函数并打印结果
+
+print("\n【各线路平均搭乘站点数统计（前10行）】")
+print(route_stats.head(10).to_string(index=False))
+
+print("\n【绘制线路平均搭乘站点数条形图】")#用seaborn把水平条形图可视化
+
+top15 = route_stats.head(15).copy()# 取均值最高的前15条线路，保留2位小数
+top15['mean_stops'] = top15['mean_stops'].round(2)
+top15['std_stops'] = top15['std_stops'].round(2)
+top15['线路号'] = top15['线路号'].astype(str)
+
+plt.figure(figsize=(12, 9))
+
+sns.barplot(
+    data=top15,
+    x='mean_stops',
+    y='线路号',
+    palette='Blues_d',
+    errorbar=None,
+    capsize=0.3
+)
+# 手动添加标准差误差棒
+# xerr=row['std_stops'] 表示误差棒向右延伸一个标准差，向左延伸一个标准差
+# capsize=5 控制误差棒两端的横线长度
+for i, (_, row) in enumerate(top15.iterrows()):# 添加标准差误差棒
+    plt.errorbar(
+        x=row['mean_stops'],
+        y=i,
+        xerr=row['std_stops'],
+        capsize=5,
+        fmt='none',
+        color='black',
+        linewidth=1.5
+    )
+
+for i, (_, row) in enumerate(top15.iterrows()):# 在每根柱子右侧标注
+    label_text = f"线路{row['线路号']}: {row['mean_stops']}±{row['std_stops']}"
+    plt.text(
+        x=row['mean_stops'] + row['std_stops'] + 0.5,
+        y=i,
+        s=label_text,
+        va='center',
+        ha='left',
+        fontsize=9,
+        color='black'
+    )
+
+plt.xlabel('平均搭乘站点数', fontsize=12)
+plt.ylabel('线路号', fontsize=12)
+plt.title('各线路乘客平均搭乘站点数（前15条线路）', fontsize=14)
+
+x_max = (top15['mean_stops'] + top15['std_stops']).max()
+plt.xlim(0, x_max + 8)
+plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter('%.1f'))
+
+plt.tight_layout()
+plt.savefig('route_stops.png', dpi=150, bbox_inches='tight')
+print("条形图已保存为 route_stops.png")
+
+plt.show()
+
+print("=" * 60)
