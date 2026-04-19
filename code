@@ -337,3 +337,64 @@ print(f"最大15分钟刷卡量（{start_time_15}~{end_time_15}）：{max_15min_
 print(f"PHF15 = {peak_hour_volume} / ( 4 × {max_15min_volume}) = {phf15:.4f}")
 
 print("=" * 60)
+
+
+# 任务5：线路驾驶员信息批量导出
+import os
+
+print("\n" + "=" * 60)
+print("任务5：线路驾驶员信息批量导出")
+print("=" * 60)
+
+#1. 筛选线路号 1101 至 1120
+# 筛选指定范围的线路
+route_mask = (df['线路号'] >= 1101) & (df['线路号'] <= 1120)
+route_df = df[route_mask].copy()
+
+# 获取所有符合条件的线路号（去重排序）
+target_routes = sorted(route_df['线路号'].unique())
+print(f"\n符合条件的线路数：{len(target_routes)} 条")
+print(f"线路号范围：{target_routes[0]} ~ {target_routes[-1]}")
+
+#2. 创建文件夹
+# os.makedirs() 创建目录，exist_ok=True 表示如果目录已存在也不报错
+folder_name = '线路驾驶员信息'
+os.makedirs(folder_name, exist_ok=True)
+print(f"\n文件夹已创建：{folder_name}")
+
+#3. 批量导出txt文件
+print("\n【导出文件列表】")
+
+for route_id in target_routes:
+    # 筛选当前线路的数据
+    single_route_df = route_df[route_df['线路号'] == route_id]
+    
+    # 提取 车辆编号 → 驾驶员编号 的对应关系，并去重
+    # drop_duplicates() 去除完全重复的行
+    vehicle_driver = single_route_df[['车辆编号', '驾驶员编号']].drop_duplicates()
+    
+    # 按车辆编号排序，便于查看
+    vehicle_driver = vehicle_driver.sort_values('车辆编号')
+    
+    # 构建文件路径
+    file_path = os.path.join(folder_name, f"{route_id}.txt")
+    
+    # 写入txt文件
+    with open(file_path, 'w', encoding='utf-8') as f:
+        # 写入表头
+        f.write(f"线路号: {route_id}\n")
+        f.write("车辆编号\t驾驶员编号\n")
+        
+        # 逐行写入数据
+        for _, row in vehicle_driver.iterrows():
+            # 驾驶员编号转为整数显示（去掉小数位）
+            driver_id = int(row['驾驶员编号']) if pd.notna(row['驾驶员编号']) else 0
+            f.write(f"{row['车辆编号']}\t\t{driver_id}\n")
+    
+    # 打印文件路径
+    print(f"  ✓ {file_path}")
+
+#4. 确认输出成功
+print(f"\n共生成 {len(target_routes)} 个txt文件")
+print("全部输出成功！")
+print("=" * 60)
