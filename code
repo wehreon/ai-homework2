@@ -398,3 +398,133 @@ for route_id in target_routes:
 print(f"\n共生成 {len(target_routes)} 个txt文件")
 print("全部输出成功！")
 print("=" * 60)
+
+
+# 任务6：服务绩效排名与热力图
+print("\n" + "=" * 60)
+print("任务6：服务绩效排名与热力图")
+print("=" * 60)
+
+#1. 排名统计
+# 只统计上车记录（刷卡类型=0）
+boarding_df = df[df['刷卡类型'] == 0]
+
+print("\n【服务人次排名统计】")
+
+# Top 10 司机
+top_drivers = boarding_df['驾驶员编号'].value_counts().head(10)
+print("\nTop 10 司机（服务人次）：")
+for i, (driver_id, count) in enumerate(top_drivers.items(), 1):
+    print(f"  {i:2d}. 司机 {int(driver_id)}: {count} 人次")
+
+# Top 10 线路
+top_routes = boarding_df['线路号'].value_counts().head(10)
+print("\nTop 10 线路（服务人次）：")
+for i, (route_id, count) in enumerate(top_routes.items(), 1):
+    print(f"  {i:2d}. 线路 {route_id}: {count} 人次")
+
+# Top 10 上车站点
+top_stops = boarding_df['上车站点'].value_counts().head(10)
+print("\nTop 10 上车站点（服务人次）：")
+for i, (stop_id, count) in enumerate(top_stops.items(), 1):
+    print(f"  {i:2d}. 站点 {stop_id}: {count} 人次")
+
+# Top 10 车辆
+top_vehicles = boarding_df['车辆编号'].value_counts().head(10)
+print("\nTop 10 车辆（服务人次）：")
+for i, (vehicle_id, count) in enumerate(top_vehicles.items(), 1):
+    print(f"  {i:2d}. 车辆 {vehicle_id}: {count} 人次")
+
+#2. 构造热力图数据矩阵
+# 将四个维度的Top10服务人次组合成一个4行10列的numpy数组
+# 每行代表一个维度（司机、线路、站点、车辆）
+# 每列代表该维度的Top1~10
+
+data_matrix = np.array([
+    top_drivers.values,      # 第1行：司机
+    top_routes.values,       # 第2行：线路
+    top_stops.values,        # 第3行：上车站点
+    top_vehicles.values      # 第4行：车辆
+])
+
+# 构造列标签：Top1 ~ Top10
+col_labels = [f'Top{i}' for i in range(1, 11)]
+
+# 行标签
+row_labels = ['司机', '线路', '上车站点', '车辆']
+
+print(f"\n数据矩阵形状: {data_matrix.shape}")
+print("矩阵内容预览:")
+print(data_matrix)
+
+#3. 绘制热力图
+print("\n【绘制服务绩效热力图】")
+
+plt.figure(figsize=(14, 6))
+
+# sns.heatmap 绘制热力图
+# annot=True 在每个格子中显示数值
+# fmt='d' 以整数格式显示数值
+# cmap='YlOrRd' 使用黄-橙-红渐变配色，颜色越深代表数值越大
+# xticklabels/yticklabels 设置行列标签
+sns.heatmap(
+    data_matrix,
+    annot=True,
+    fmt='d',
+    cmap='YlOrRd',
+    xticklabels=col_labels,
+    yticklabels=row_labels,
+    cbar_kws={'label': '服务人次'},
+    linewidths=0.5,
+    linecolor='white'
+)
+
+plt.xlabel('排名', fontsize=12)
+plt.ylabel('维度', fontsize=12)
+plt.title('公交服务绩效Top10排名热力图\n', fontsize=14, fontweight='bold')
+
+# 副标题说明
+plt.text(
+    x=0.5, y=-0.15,
+    s='注：颜色越深表示服务人次越多，各维度数值差异反映服务资源集中程度',
+    transform=plt.gca().transAxes,
+    ha='center',
+    fontsize=10,
+    style='italic'
+)
+
+# x轴标签旋转0度（默认就是0度，明确设置）
+plt.xticks(rotation=0)
+
+plt.tight_layout()
+plt.savefig('performance_heatmap.png', dpi=150, bbox_inches='tight')
+print("热力图已保存为 performance_heatmap.png")
+
+plt.show()
+
+#4. 结论说明
+print("\n【结论说明】")
+print("=" * 60)
+print("""
+从热力图中可以观察到以下服务绩效规律：
+
+1. 车辆维度出现有车一骑绝尘：车辆0以11774人次超过第二名
+   近6倍，说明该车可能是某条高客流线路的主力运营车辆。
+
+2. 司机维度也差不多：司机90422201服务5712人次排名第一，与司
+   机0（4893人次）共同构成第一梯队，远超其他司机，体现了排班集中
+   或服务于高客流线路的特征。
+
+3. 线路维度46003也有类似情况：以7127人次位居榜首，比第二名高出45%，
+   该线路应作为运力调配和服务优化的重点关注对象。
+
+4. 站点维度分布最为均衡：Top10站点服务人次极差仅2069（7776-5707），
+   说明各主要站点的客流分布相对均匀，未出现极端不均衡现象。
+
+5. 整体呈现"幂律分布"特征：各维度Top3与后续排名差距显著，符合公
+   共交通领域少数资源承担多数服务的普遍规律。
+
+建议：对车辆0和司机90422201进行重点跟踪分析其运营模式，评估是否
+可复制推广；同时关注46003线路的运力匹配度，避免高峰期过度拥挤。
+""")
+print("=" * 60)
